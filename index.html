@@ -397,7 +397,7 @@
                     const distance = calculateDistance(userPosition, currentPosition);
                     if (!isNaN(distance)) {
                         const googleDirections = `https://www.google.com/maps/dir/${userPosition[0]},${userPosition[1]}/${currentPosition[0]},${currentPosition[1]}`;
-                        const osmDirections = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=${userPosition[0]}%2C${userPosition[1]}%3B${currentPosition[0]}%2C${currentPosition[1]}`;
+                        const osmDirections = `https://www.openstreetmap.org/directions?engine=fossgis_graphhopper_car&route=${userPosition[0]}%2C${userPosition[1]}%3B${currentPosition[0]}%2C${currentPosition[1]}`;
                         
                         shareText += `\n\nDistancia: ${distance.toFixed(2)} km\n\nIndicaciones para llegar:\n• Google Maps: ${googleDirections}\n• OpenStreetMap: ${osmDirections}`;
                     }
