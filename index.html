@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ubicación e indicaciones.</title>
+    <title>Compartir Ubicación</title>
     
-    <!-- Asegurando que Leaflet se cargue correctamente -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
           integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
           crossorigin=""/>
      
-    <!-- Asegúrate de cargar el script de Leaflet antes de tu código -->
+    <!-- Leaflet JavaScript -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" 
             integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" 
             crossorigin=""></script>
@@ -129,6 +129,15 @@
             display: block;
         }
         
+        .status-message.loading {
+            background-color: #e0f3ff;
+            color: #004085;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
         /* Estilos para el popup del mensaje */
         .leaflet-popup-content-wrapper {
             background-color: #25D366;
@@ -156,11 +165,26 @@
             max-width: 200px;
             word-wrap: break-word;
         }
+        
+        /* Spinner para indicar carga */
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Compartir Ubicación y brindar indicaciones de cómo llegar.</h1>
+        <h1>Enviar ubicación e instrucciones.</h1>
         
         <div id="map"></div>
         <div id="mapError" class="map-error">
@@ -169,8 +193,8 @@
         </div>
         
         <div class="controls">
-            <textarea id="message" placeholder="Escribe tu mensaje para mostrar sobre el marcador" rows="2">¡Nos vemos aquí!</textarea>
-            <button id="updateMsgBtn">Actualizar mensaje en el marcador</button>
+            <textarea id="message" placeholder="Escribe tu mensaje para mostrar sobre el marcador, por ejemplo '¡Nos vemos aquí!" rows="2"></textarea>
+            <button id="updateMsgBtn">Actualizar mensaje en el marcador.</button>
             <button id="shareBtn">
                 <svg class="whatsapp-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
                     <path fill="white" d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
@@ -190,10 +214,15 @@
         // Variables globales
         let map;
         let marker;
+        let userMarker;
         let popup;
-        let currentPosition = [20.6534, -103.3919]; // Default: Guadalajara, México. Por molestar.
+        let routeLine;
+        let currentPosition = [20.6534, -103.3919]; // Default: Guadalajara, México
         let userPosition = [20.6534, -103.3919]; // Posición del usuario
         let mapLoaded = false;
+        
+        // API key de GraphHopper (gratuita)
+        const GRAPHHOPPER_API_KEY = "3e2b25a9-0ecc-4c60-8227-edaa4232b385";
         
         // Función para inicializar el mapa cuando la página esté cargada
         document.addEventListener('DOMContentLoaded', function() {
@@ -233,6 +262,9 @@
                         marker.setLatLng(currentPosition);
                         map.setView(currentPosition, 16);
                         marker.openPopup();
+                        
+                        // Create user marker
+                        createUserMarker();
                     }
                 }, function(error) {
                     console.error('Error getting location:', error);
@@ -253,6 +285,186 @@
             document.getElementById('locationInfo').innerHTML = 
                 `Ubicación aproximada: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
             mapLoaded = false;
+        }
+        
+        // Crear marcador para la ubicación del usuario
+        function createUserMarker() {
+            try {
+                if (map && mapLoaded) {
+                    // Crear icono personalizado para el usuario (azul)
+                    const userIcon = L.icon({
+                        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+                        shadowSize: [41, 41]
+                    });
+                    
+                    // Si ya existe un marcador de usuario, eliminarlo
+                    if (userMarker) {
+                        map.removeLayer(userMarker);
+                    }
+                    
+                    // Crear nuevo marcador para el usuario
+                    userMarker = L.marker(userPosition, {
+                        icon: userIcon
+                    }).addTo(map);
+                    
+                    userMarker.bindPopup("Tu ubicación actual");
+                    
+                    // Dibujar ruta si el destino es diferente a la ubicación del usuario
+                    if (currentPosition[0] !== userPosition[0] || currentPosition[1] !== userPosition[1]) {
+                        drawRoute();
+                    }
+                }
+            } catch (error) {
+                console.error("Error al crear marcador de usuario:", error);
+            }
+        }
+        
+        // Dibujar ruta entre la ubicación del usuario y el destino
+        function drawRoute() {
+            try {
+                if (map && mapLoaded) {
+                    // Limpiar ruta anterior si existe
+                    if (routeLine) {
+                        map.removeLayer(routeLine);
+                    }
+                    
+                    // Mostrar mensaje de carga
+                    const statusMessage = document.getElementById('statusMessage');
+                    statusMessage.innerHTML = '<div class="spinner"></div> Calculando ruta...';
+                    statusMessage.className = 'status-message loading';
+                    
+                    // Obtener la ruta desde GraphHopper
+                    const url = `https://graphhopper.com/api/1/route?point=${userPosition[0]},${userPosition[1]}&point=${currentPosition[0]},${currentPosition[1]}&vehicle=car&locale=es&calc_points=true&key=${GRAPHHOPPER_API_KEY}`;
+                    
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.paths && data.paths.length > 0) {
+                                const path = data.paths[0];
+                                
+                                // Decodificar puntos de la ruta
+                                const points = decodePolyline(path.points);
+                                
+                                // Crear línea de la ruta
+                                routeLine = L.polyline(points, {
+                                    color: '#0080ff',
+                                    weight: 5,
+                                    opacity: 0.7
+                                }).addTo(map);
+                                
+                                // Ajustar vista para mostrar toda la ruta
+                                map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                                
+                                // Actualizar información con la distancia de la ruta
+                                const distanceKm = (path.distance / 1000).toFixed(2);
+                                updateLocationInfo(distanceKm);
+                                
+                                // Ocultar mensaje de carga
+                                statusMessage.className = 'status-message';
+                            } else {
+                                console.error("Error en respuesta de GraphHopper:", data);
+                                
+                                // Dibujar línea recta como fallback
+                                drawStraightLine();
+                                
+                                // Mostrar mensaje de error
+                                statusMessage.textContent = 'No se pudo calcular la ruta detallada. Mostrando línea recta.';
+                                statusMessage.className = 'status-message error';
+                                
+                                // Ocultar mensaje después de 3 segundos
+                                setTimeout(() => {
+                                    statusMessage.className = 'status-message';
+                                }, 3000);
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error obteniendo ruta:", error);
+                            
+                            // Dibujar línea recta como fallback
+                            drawStraightLine();
+                            
+                            // Mostrar mensaje de error
+                            statusMessage.textContent = 'Error al calcular la ruta. Mostrando línea recta.';
+                            statusMessage.className = 'status-message error';
+                            
+                            // Ocultar mensaje después de 3 segundos
+                            setTimeout(() => {
+                                statusMessage.className = 'status-message';
+                            }, 3000);
+                        });
+                }
+            } catch (error) {
+                console.error("Error al dibujar ruta:", error);
+                
+                // Dibujar línea recta como fallback
+                drawStraightLine();
+            }
+        }
+        
+        // Función para decodificar polyline de GraphHopper
+        function decodePolyline(encoded) {
+            // Array that will contain the points
+            var points = [];
+            var index = 0, len = encoded.length;
+            var lat = 0, lng = 0;
+            
+            while (index < len) {
+                var b, shift = 0, result = 0;
+                
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                
+                var dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+                lat += dlat;
+                
+                shift = 0;
+                result = 0;
+                
+                do {
+                    b = encoded.charCodeAt(index++) - 63;
+                    result |= (b & 0x1f) << shift;
+                    shift += 5;
+                } while (b >= 0x20);
+                
+                var dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+                lng += dlng;
+                
+                points.push([lat * 1e-5, lng * 1e-5]);
+            }
+            
+            return points;
+        }
+        
+        // Dibujar línea recta entre la ubicación del usuario y el destino (fallback)
+        function drawStraightLine() {
+            try {
+                if (map && mapLoaded) {
+                    // Limpiar ruta anterior si existe
+                    if (routeLine) {
+                        map.removeLayer(routeLine);
+                    }
+                    
+                    // Crear línea recta
+                    routeLine = L.polyline([userPosition, currentPosition], {
+                        color: '#ff4040',
+                        weight: 3,
+                        opacity: 0.7,
+                        dashArray: '5, 10'
+                    }).addTo(map);
+                    
+                    // Ajustar vista para mostrar toda la línea
+                    map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                }
+            } catch (error) {
+                console.error("Error al dibujar línea recta:", error);
+            }
         }
         
         // Initialize the map
@@ -287,6 +499,11 @@
                     currentPosition = [marker.getLatLng().lat, marker.getLatLng().lng];
                     updateLocationInfo();
                     marker.openPopup();
+                    
+                    // Dibujar ruta si la ubicación del usuario está disponible
+                    if (userMarker) {
+                        drawRoute();
+                    }
                 });
                 
                 // Update marker position when map is clicked
@@ -295,6 +512,11 @@
                     marker.setLatLng(e.latlng);
                     updateLocationInfo();
                     marker.openPopup();
+                    
+                    // Dibujar ruta si la ubicación del usuario está disponible
+                    if (userMarker) {
+                        drawRoute();
+                    }
                 });
                 
                 // Marcar como cargado con éxito
@@ -330,7 +552,7 @@
         }
         
         // Update location information text
-        function updateLocationInfo() {
+        function updateLocationInfo(routeDistance) {
             try {
                 const lat = currentPosition[0].toFixed(6);
                 const lng = currentPosition[1].toFixed(6);
@@ -339,9 +561,13 @@
                 
                 // Calcular distancia desde la ubicación del usuario si es diferente
                 if (userPosition[0] !== currentPosition[0] || userPosition[1] !== currentPosition[1]) {
-                    const distance = calculateDistance(userPosition, currentPosition);
-                    if (!isNaN(distance)) {
-                        infoText += `<br>Distancia: ${distance.toFixed(2)} km`;
+                    const lineDistance = calculateDistance(userPosition, currentPosition);
+                    
+                    if (routeDistance) {
+                        infoText += `<br>Distancia por carretera: ${routeDistance} km`;
+                        infoText += `<br>Distancia en línea recta: ${lineDistance.toFixed(2)} km`;
+                    } else {
+                        infoText += `<br>Distancia: ${lineDistance.toFixed(2)} km`;
                     }
                 }
                 
@@ -386,22 +612,151 @@
                 const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
                 
                 // URLs para compartir
-                const osmUrl = `https://www.openstreetmap.org/?mlat=${currentPosition[0]}&mlon=${currentPosition[1]}&zoom=16`;
                 const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
                 
-                // Texto para compartir
-                let shareText = `*${message}*\n\n${locationText}`;
+                // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
+                const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
+                const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_graphhopper_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
                 
-                // Enlaces para compartir direcciones si es diferente a la ubicación del usuario
-                if (userPosition[0] !== currentPosition[0] || userPosition[1] !== currentPosition[1]) {
-                    const distance = calculateDistance(userPosition, currentPosition);
-                    if (!isNaN(distance)) {
-                        const googleDirections = `https://www.google.com/maps/dir/${userPosition[0]},${userPosition[1]}/${currentPosition[0]},${currentPosition[1]}`;
-                        const osmDirections = `https://www.openstreetmap.org/directions?engine=fossgis_graphhopper_car&route=${userPosition[0]}%2C${userPosition[1]}%3B${currentPosition[0]}%2C${currentPosition[1]}`;
+                // Mostrar mensaje de carga
+                const statusMessage = document.getElementById('statusMessage');
+                statusMessage.innerHTML = '<div class="spinner"></div> Obteniendo instrucciones de ruta...';
+                statusMessage.className = 'status-message loading';
+                
+                // Intenta obtener instrucciones de ruta
+                const url = `https://graphhopper.com/api/1/route?point=${userPosition[0]},${userPosition[1]}&point=${currentPosition[0]},${currentPosition[1]}&vehicle=car&locale=es&instructions=true&calc_points=true&key=${GRAPHHOPPER_API_KEY}`;
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        let routeInstructions = [];
+                        let distanceKm = "desconocida";
+                        let timeMinutes = "desconocido";
                         
-                        shareText += `\n\nDistancia: ${distance.toFixed(2)} km\n\nIndicaciones para llegar:\n• Google Maps: ${googleDirections}\n• OpenStreetMap: ${osmDirections}`;
-                    }
-                }
+                        // Extraer instrucciones si están disponibles
+                        if (data.paths && data.paths.length > 0) {
+                            const path = data.paths[0];
+                            
+                            // Obtener distancia y tiempo
+                            distanceKm = (path.distance / 1000).toFixed(2);
+                            timeMinutes = Math.round(path.time / 60000); // convertir ms a minutos
+                            
+                            // Obtener instrucciones
+                            if (path.instructions && path.instructions.length > 0) {
+                                // Limitar a 5 instrucciones principales para no hacer el mensaje demasiado largo
+                                const maxInstructions = Math.min(path.instructions.length, 5);
+                                
+                                for (let i = 0; i < maxInstructions; i++) {
+                                    const instruction = path.instructions[i];
+                                    let text = instruction.text;
+                                    
+                                    // Añadir distancia para cada instrucción
+                                    if (instruction.distance > 0) {
+                                        const dist = instruction.distance > 1000 
+                                            ? (instruction.distance / 1000).toFixed(1) + ' km' 
+                                            : Math.round(instruction.distance) + ' m';
+                                        text += ` (${dist})`;
+                                    }
+                                    
+                                    routeInstructions.push(text);
+                                }
+                                
+                                // Si hay más instrucciones, indicarlo
+                                if (path.instructions.length > maxInstructions) {
+                                    routeInstructions.push(`... y ${path.instructions.length - maxInstructions} indicaciones más`);
+                                }
+                            }
+                        }
+                        
+                        // Preparar texto para compartir
+                        let shareText = `*${message}*\n\n${locationText}`;
+                        
+                        // Añadir resumen de la ruta
+                        shareText += `\n\nDistancia aproximada: ${distanceKm} km`;
+                        if (timeMinutes !== "desconocido") {
+                            shareText += `\nTiempo estimado: ${timeMinutes} min`;
+                        }
+                        
+                        // Añadir instrucciones de la ruta si están disponibles
+                        if (routeInstructions.length > 0) {
+                            shareText += "\n\n*INSTRUCCIONES DE RUTA (referencia):*";
+                            routeInstructions.forEach((instruction, index) => {
+                                shareText += `\n${index + 1}. ${instruction}`;
+                            });
+                        }
+                        
+                        // Añadir enlaces para indicaciones desde la ubicación de quien recibe
+                        shareText += `\n\n*Indicaciones desde tu ubicación actual:*`;
+                        shareText += `\n• Google Maps: ${googleDirectionsFromCurrentLocation}`;
+                        shareText += `\n• Leaflet/OpenStreetMap: ${leafletDirectionsUrl}`;
+                        
+                        // Añadir enlace para ver ubicación
+                        shareText += `\n\n*Ver ubicación:*\n${googleMapsUrl}`;
+                        
+                        // Compartir a WhatsApp
+                        const encodedText = encodeURIComponent(shareText);
+                        
+                        // Detectar dispositivo móvil
+                        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                        const whatsappURL = isMobile ? 
+                            `whatsapp://send?text=${encodedText}` : 
+                            `https://web.whatsapp.com/send?text=${encodedText}`;
+                        
+                        // Mostrar mensaje de éxito
+                        statusMessage.textContent = 'Abriendo WhatsApp...';
+                        statusMessage.className = 'status-message success';
+                        
+                        // Abrir WhatsApp después de mostrar el mensaje
+                        setTimeout(() => {
+                            window.open(whatsappURL, '_blank');
+                            
+                            // Ocultar mensaje después de unos segundos
+                            setTimeout(() => {
+                                statusMessage.className = 'status-message';
+                            }, 3000);
+                        }, 500);
+                    })
+                    .catch(error => {
+                        console.error("Error obteniendo instrucciones:", error);
+                        
+                        // En caso de error, compartir sin instrucciones detalladas
+                        shareWithoutInstructions();
+                    });
+            } catch (error) {
+                console.error("Error al compartir:", error);
+                
+                // En caso de error, compartir sin instrucciones detalladas
+                shareWithoutInstructions();
+            }
+        }
+        
+        // Compartir sin instrucciones detalladas (fallback)
+        function shareWithoutInstructions() {
+            try {
+                const message = document.getElementById('message').value;
+                const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
+                
+                // URLs para compartir
+                const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
+                
+                // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
+                const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
+                const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
+                
+                // Calcular distancia
+                const distance = calculateDistance(userPosition, currentPosition);
+                const distanceText = !isNaN(distance) ? `\n\nDistancia aproximada: ${distance.toFixed(2)} km` : '';
+                
+                // Texto para compartir
+                let shareText = `*${message}*\n\n${locationText}${distanceText}`;
+                
+                // Añadir enlaces para indicaciones desde la ubicación de quien recibe
+                shareText += `\n\n*¿Cómo llego desde donde estoy?:*`;
+                shareText += `\n• Ver en el mapa.: ${googleDirectionsFromCurrentLocation}`;
+                //shareText += `\n• Leaflet/OpenStreetMap: ${leafletDirectionsUrl}`;
+                
+                // Añadir enlace para ver ubicación
+                shareText += `\n\n*Ver ubicación:*\n${googleMapsUrl}`;
                 
                 // Compartir a WhatsApp
                 const encodedText = encodeURIComponent(shareText);
@@ -428,7 +783,7 @@
                 }, 500);
                 
             } catch (error) {
-                console.error("Error al compartir:", error);
+                console.error("Error en el fallback:", error);
                 
                 // Mostrar mensaje de error
                 const statusMessage = document.getElementById('statusMessage');
