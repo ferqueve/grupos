@@ -193,8 +193,15 @@
         </div>
         
         <div class="controls">
-            <textarea id="message" placeholder="Escribe tu mensaje para mostrar sobre el marcador, por ejemplo '¡Nos vemos aquí!" rows="2"></textarea>
-            <button id="updateMsgBtn">Actualizar mensaje en el marcador.</button>
+            <textarea id="message" placeholder="Escribe tu mensaje para mostrar sobre el marcador" rows="2">¡Nos vemos aquí!</textarea>
+            <button id="updateMsgBtn">Actualizar mensaje</button>
+            <button id="captureImageBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15C13.6569 15 15 13.6569 15 12C15 10.3431 13.6569 9 12 9C10.3431 9 9 10.3431 9 12C9 13.6569 10.3431 15 12 15Z" fill="white"/>
+                    <path fill-rule="evenodd" clip-rule="evenodd" d="M9 2L7.17 4H4C2.9 4 2 4.9 2 6V18C2 19.1 2.9 20 4 20H20C21.1 20 22 19.1 22 18V6C22 4.9 21.1 4 20 4H16.83L15 2H9ZM12 17C9.24 17 7 14.76 7 12C7 9.24 9.24 7 12 7C14.76 7 17 9.24 17 12C17 14.76 14.76 17 12 17Z" fill="white"/>
+                </svg>
+                Capturar y compartir imagen
+            </button>
             <button id="shareBtn">
                 <svg class="whatsapp-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
                     <path fill="white" d="M380.9 97.1C339 55.1 283.2 32 223.9 32c-122.4 0-222 99.6-222 222 0 39.1 10.2 77.3 29.6 111L0 480l117.7-30.9c32.4 17.7 68.9 27 106.1 27h.1c122.3 0 224.1-99.6 224.1-222 0-59.3-25.2-115-67.1-157zm-157 341.6c-33.2 0-65.7-8.9-94-25.7l-6.7-4-69.8 18.3L72 359.2l-4.4-7c-18.5-29.4-28.2-63.3-28.2-98.2 0-101.7 82.8-184.5 184.6-184.5 49.3 0 95.6 19.2 130.4 54.1 34.8 34.9 56.2 81.2 56.1 130.5 0 101.8-84.9 184.6-186.6 184.6zm101.2-138.2c-5.5-2.8-32.8-16.2-37.9-18-5.1-1.9-8.8-2.8-12.5 2.8-3.7 5.6-14.3 18-17.6 21.8-3.2 3.7-6.5 4.2-12 1.4-32.6-16.3-54-29.1-75.5-66-5.7-9.8 5.7-9.1 16.3-30.3 1.8-3.7.9-6.9-.5-9.7-1.4-2.8-12.5-30.1-17.1-41.2-4.5-10.8-9.1-9.3-12.5-9.5-3.2-.2-6.9-.2-10.6-.2-3.7 0-9.7 1.4-14.8 6.9-5.1 5.6-19.4 19-19.4 46.3 0 27.3 19.9 53.7 22.6 57.4 2.8 3.7 39.1 59.7 94.8 83.8 35.2 15.2 49 16.5 66.6 13.9 10.7-1.6 32.8-13.4 37.4-26.4 4.6-13 4.6-24.1 3.2-26.4-1.3-2.5-5-3.9-10.5-6.6z"/>
@@ -246,7 +253,8 @@
             
             // Botón para compartir
             document.getElementById('shareBtn').addEventListener('click', shareToWhatsApp);
-            
+            // Botón para capturar y compartir imagen
+            document.getElementById('captureImageBtn').addEventListener('click', captureAndShareMapImage);
             // Intentar obtener la ubicación actual del usuario
             if (navigator.geolocation) {
                 document.getElementById('locationInfo').innerHTML = 'Obteniendo tu ubicación...';
@@ -605,158 +613,93 @@
             }
         }
         
-        // Compartir a WhatsApp
-        function shareToWhatsApp() {
-            try {
-                const message = document.getElementById('message').value;
-                const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
-                
-                // URLs para compartir
-                const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
-                
-                // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
-                const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
-                const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_graphhopper_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
-                
-                // Mostrar mensaje de carga
-                const statusMessage = document.getElementById('statusMessage');
-                statusMessage.innerHTML = '<div class="spinner"></div> Obteniendo instrucciones de ruta...';
-                statusMessage.className = 'status-message loading';
-                
-                // Intenta obtener instrucciones de ruta
-                const url = `https://graphhopper.com/api/1/route?point=${userPosition[0]},${userPosition[1]}&point=${currentPosition[0]},${currentPosition[1]}&vehicle=car&locale=es&instructions=true&calc_points=true&key=${GRAPHHOPPER_API_KEY}`;
-                
-                fetch(url)
-                    .then(response => response.json())
-                    .then(data => {
-                        let routeInstructions = [];
-                        let distanceKm = "desconocida";
-                        let timeMinutes = "desconocido";
-                        
-                        // Extraer instrucciones si están disponibles
-                        if (data.paths && data.paths.length > 0) {
-                            const path = data.paths[0];
-                            
-                            // Obtener distancia y tiempo
-                            distanceKm = (path.distance / 1000).toFixed(2);
-                            timeMinutes = Math.round(path.time / 60000); // convertir ms a minutos
-                            
-                            // Obtener instrucciones
-                            if (path.instructions && path.instructions.length > 0) {
-                                // Limitar a 5 instrucciones principales para no hacer el mensaje demasiado largo
-                                const maxInstructions = Math.min(path.instructions.length, 5);
-                                
-                                for (let i = 0; i < maxInstructions; i++) {
-                                    const instruction = path.instructions[i];
-                                    let text = instruction.text;
-                                    
-                                    // Añadir distancia para cada instrucción
-                                    if (instruction.distance > 0) {
-                                        const dist = instruction.distance > 1000 
-                                            ? (instruction.distance / 1000).toFixed(1) + ' km' 
-                                            : Math.round(instruction.distance) + ' m';
-                                        text += ` (${dist})`;
-                                    }
-                                    
-                                    routeInstructions.push(text);
-                                }
-                                
-                                // Si hay más instrucciones, indicarlo
-                                if (path.instructions.length > maxInstructions) {
-                                    routeInstructions.push(`... y ${path.instructions.length - maxInstructions} indicaciones más`);
-                                }
-                            }
-                        }
-                        
-                        // Preparar texto para compartir
-                        let shareText = `*${message}*\n\n${locationText}`;
-                        
-                        // Añadir resumen de la ruta
-                        shareText += `\n\nDistancia aproximada: ${distanceKm} km`;
-                        if (timeMinutes !== "desconocido") {
-                            shareText += `\nTiempo estimado: ${timeMinutes} min`;
-                        }
-                        
-                        // Añadir instrucciones de la ruta si están disponibles
-                        if (routeInstructions.length > 0) {
-                            shareText += "\n\n*INSTRUCCIONES DE RUTA (referencia):*";
-                            routeInstructions.forEach((instruction, index) => {
-                                shareText += `\n${index + 1}. ${instruction}`;
-                            });
-                        }
-                        
-                        // Añadir enlaces para indicaciones desde la ubicación de quien recibe
-                        shareText += `\n\n*Indicaciones desde tu ubicación actual:*`;
-                        shareText += `\n• Google Maps: ${googleDirectionsFromCurrentLocation}`;
-                        shareText += `\n• Leaflet/OpenStreetMap: ${leafletDirectionsUrl}`;
-                        
-                        // Añadir enlace para ver ubicación
-                        shareText += `\n\n*Ver ubicación:*\n${googleMapsUrl}`;
-                        
-                        // Compartir a WhatsApp
-                        const encodedText = encodeURIComponent(shareText);
-                        
-                        // Detectar dispositivo móvil
-                        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        const whatsappURL = isMobile ? 
-                            `whatsapp://send?text=${encodedText}` : 
-                            `https://web.whatsapp.com/send?text=${encodedText}`;
-                        
-                        // Mostrar mensaje de éxito
-                        statusMessage.textContent = 'Abriendo WhatsApp...';
-                        statusMessage.className = 'status-message success';
-                        
-                        // Abrir WhatsApp después de mostrar el mensaje
-                        setTimeout(() => {
-                            window.open(whatsappURL, '_blank');
-                            
-                            // Ocultar mensaje después de unos segundos
-                            setTimeout(() => {
-                                statusMessage.className = 'status-message';
-                            }, 3000);
-                        }, 500);
-                    })
-                    .catch(error => {
-                        console.error("Error obteniendo instrucciones:", error);
-                        
-                        // En caso de error, compartir sin instrucciones detalladas
-                        shareWithoutInstructions();
-                    });
-            } catch (error) {
-                console.error("Error al compartir:", error);
-                
-                // En caso de error, compartir sin instrucciones detalladas
-                shareWithoutInstructions();
-            }
-        }
+       // Compartir a WhatsApp con enlaces limpios
+function shareToWhatsApp() {
+    try {
+        const message = document.getElementById('message').value;
+        const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
         
-        // Compartir sin instrucciones detalladas (fallback)
-        function shareWithoutInstructions() {
-            try {
-                const message = document.getElementById('message').value;
-                const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
+        // URLs para compartir
+        const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
+        
+        // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
+        const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
+        const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
+        
+        // Mostrar mensaje de carga
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.innerHTML = '<div class="spinner"></div> Obteniendo instrucciones de ruta...';
+        statusMessage.className = 'status-message loading';
+        
+        // Intenta obtener instrucciones de ruta
+        const url = `https://graphhopper.com/api/1/route?point=${userPosition[0]},${userPosition[1]}&point=${currentPosition[0]},${currentPosition[1]}&vehicle=car&locale=es&instructions=true&calc_points=true&key=${GRAPHHOPPER_API_KEY}`;
+        
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                let routeInstructions = [];
+                let distanceKm = "desconocida";
+                let timeMinutes = "desconocido";
                 
-                // URLs para compartir
-                const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
+                // Extraer instrucciones si están disponibles
+                if (data.paths && data.paths.length > 0) {
+                    const path = data.paths[0];
+                    
+                    // Obtener distancia y tiempo
+                    distanceKm = (path.distance / 1000).toFixed(2);
+                    timeMinutes = Math.round(path.time / 60000); // convertir ms a minutos
+                    
+                    // Obtener instrucciones
+                    if (path.instructions && path.instructions.length > 0) {
+                        // Limitar a 5 instrucciones principales para no hacer el mensaje demasiado largo
+                        const maxInstructions = Math.min(path.instructions.length, 5);
+                        
+                        for (let i = 0; i < maxInstructions; i++) {
+                            const instruction = path.instructions[i];
+                            let text = instruction.text;
+                            
+                            // Añadir distancia para cada instrucción
+                            if (instruction.distance > 0) {
+                                const dist = instruction.distance > 1000 
+                                    ? (instruction.distance / 1000).toFixed(1) + ' km' 
+                                    : Math.round(instruction.distance) + ' m';
+                                text += ` (${dist})`;
+                            }
+                            
+                            routeInstructions.push(text);
+                        }
+                        
+                        // Si hay más instrucciones, indicarlo
+                        if (path.instructions.length > maxInstructions) {
+                            routeInstructions.push(`... y ${path.instructions.length - maxInstructions} indicaciones más`);
+                        }
+                    }
+                }
                 
-                // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
-                const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
-                const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
+                // Preparar texto para compartir
+                let shareText = `*${message}*\n\n${locationText}`;
                 
-                // Calcular distancia
-                const distance = calculateDistance(userPosition, currentPosition);
-                const distanceText = !isNaN(distance) ? `\n\nDistancia aproximada: ${distance.toFixed(2)} km` : '';
+                // Añadir resumen de la ruta
+                shareText += `\n\nDistancia aproximada: ${distanceKm} km`;
+                if (timeMinutes !== "desconocido") {
+                    shareText += `\nTiempo estimado: ${timeMinutes} min`;
+                }
                 
-                // Texto para compartir
-                let shareText = `*${message}*\n\n${locationText}${distanceText}`;
+                // Añadir instrucciones de la ruta si están disponibles
+                if (routeInstructions.length > 0) {
+                    shareText += "\n\n*INSTRUCCIONES DE RUTA (referencia):*";
+                    routeInstructions.forEach((instruction, index) => {
+                        shareText += `\n${index + 1}. ${instruction}`;
+                    });
+                }
                 
-                // Añadir enlaces para indicaciones desde la ubicación de quien recibe
-                shareText += `\n\n*¿Cómo llego desde donde estoy?:*`;
-                shareText += `\n• Ver en el mapa.: ${googleDirectionsFromCurrentLocation}`;
-                //shareText += `\n• Leaflet/OpenStreetMap: ${leafletDirectionsUrl}`;
+                // Añadir enlaces con textos personalizados para direcciones desde la ubicación de quien recibe
+                shareText += `\n\n*Indicaciones desde tu ubicación actual:*`;
+                shareText += `\n• [Ver ruta en Google Maps](${googleDirectionsFromCurrentLocation})`;
+                shareText += `\n• [Ver ruta en OpenStreetMap](${leafletDirectionsUrl})`;
                 
-                // Añadir enlace para ver ubicación
-                shareText += `\n\n*Ver ubicación:*\n${googleMapsUrl}`;
+                // Añadir enlace para ver ubicación con texto personalizado
+                shareText += `\n\n[Ver ubicación en el mapa](${googleMapsUrl})`;
                 
                 // Compartir a WhatsApp
                 const encodedText = encodeURIComponent(shareText);
@@ -768,7 +711,6 @@
                     `https://web.whatsapp.com/send?text=${encodedText}`;
                 
                 // Mostrar mensaje de éxito
-                const statusMessage = document.getElementById('statusMessage');
                 statusMessage.textContent = 'Abriendo WhatsApp...';
                 statusMessage.className = 'status-message success';
                 
@@ -781,16 +723,288 @@
                         statusMessage.className = 'status-message';
                     }, 3000);
                 }, 500);
+            })
+            .catch(error => {
+                console.error("Error obteniendo instrucciones:", error);
                 
-            } catch (error) {
-                console.error("Error en el fallback:", error);
-                
-                // Mostrar mensaje de error
-                const statusMessage = document.getElementById('statusMessage');
-                statusMessage.textContent = 'Error al compartir. Intenta de nuevo.';
-                statusMessage.className = 'status-message error';
-            }
+                // En caso de error, compartir sin instrucciones detalladas
+                shareWithoutInstructions();
+            });
+    } catch (error) {
+        console.error("Error al compartir:", error);
+        
+        // En caso de error, compartir sin instrucciones detalladas
+        shareWithoutInstructions();
+    }
+}
+
+// Compartir sin instrucciones detalladas (fallback) con enlaces limpios
+function shareWithoutInstructions() {
+    try {
+        const message = document.getElementById('message').value;
+        const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
+        
+        // URLs para compartir
+        const googleMapsUrl = `https://www.google.com/maps?q=${currentPosition[0]},${currentPosition[1]}`;
+        
+        // Enlaces para direcciones desde la ubicación actual de quien recibe el mensaje
+        const googleDirectionsFromCurrentLocation = `https://www.google.com/maps/dir/current+location/${currentPosition[0]},${currentPosition[1]}`;
+        const leafletDirectionsUrl = `https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=current;${currentPosition[0]}%2C${currentPosition[1]}#map=12/${currentPosition[0]}/${currentPosition[1]}`;
+        
+        // Calcular distancia
+        const distance = calculateDistance(userPosition, currentPosition);
+        const distanceText = !isNaN(distance) ? `\n\nDistancia aproximada: ${distance.toFixed(2)} km` : '';
+        
+        // Texto para compartir
+        let shareText = `*${message}*\n\n${locationText}${distanceText}`;
+        
+        // Añadir enlaces para indicaciones desde la ubicación de quien recibe con texto personalizado
+        shareText += `\n\n*Indicaciones desde tu ubicación actual:*`;
+        shareText += `\n• [Ver ruta en Google Maps](${googleDirectionsFromCurrentLocation})`;
+        shareText += `\n• [Ver ruta en OpenStreetMap](${leafletDirectionsUrl})`;
+        
+        // Añadir enlace para ver ubicación con texto personalizado
+        shareText += `\n\n[Ver ubicación en el mapa](${googleMapsUrl})`;
+        
+        // Compartir a WhatsApp
+        const encodedText = encodeURIComponent(shareText);
+        
+        // Detectar dispositivo móvil
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const whatsappURL = isMobile ? 
+            `whatsapp://send?text=${encodedText}` : 
+            `https://web.whatsapp.com/send?text=${encodedText}`;
+        
+        // Mostrar mensaje de éxito
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.textContent = 'Abriendo WhatsApp...';
+        statusMessage.className = 'status-message success';
+        
+        // Abrir WhatsApp después de mostrar el mensaje
+        setTimeout(() => {
+            window.open(whatsappURL, '_blank');
+            
+            // Ocultar mensaje después de unos segundos
+            setTimeout(() => {
+                statusMessage.className = 'status-message';
+            }, 3000);
+        }, 500);
+        
+    } catch (error) {
+        console.error("Error en el fallback:", error);
+        
+        // Mostrar mensaje de error
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.textContent = 'Error al compartir. Intenta de nuevo.';
+        statusMessage.className = 'status-message error';
+    }
+}
+// Función para capturar el mapa y compartir como imagen
+// Función para capturar el mapa y compartir como imagen (versión corregida)
+function captureAndShareMapImage() {
+    try {
+        // Mostrar mensaje de carga
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.innerHTML = '<div class="spinner"></div> Capturando mapa...';
+        statusMessage.className = 'status-message loading';
+        
+        // Asegurarse de que el popup está abierto
+        if (marker && popup) {
+            marker.openPopup();
         }
+        
+        // Asegurarse de que la ruta es visible si existe
+        if (routeLine) {
+            routeLine.bringToFront();
+        }
+        
+        // Pequeño retraso para asegurar que todo está renderizado
+        setTimeout(() => {
+            // Capturar el mapa usando html2canvas
+            html2canvas(document.getElementById('map'), {
+                useCORS: true,
+                allowTaint: true,
+                logging: true,
+                backgroundColor: null
+            }).then(canvas => {
+                try {
+                    // Convertir canvas a imagen
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    // Crear un elemento de imagen para mostrar la captura
+                    const img = document.createElement('img');
+                    img.src = imgData;
+                    img.style.width = '100%';
+                    img.style.maxWidth = '100%';
+                    img.style.borderRadius = '8px';
+                    img.style.marginBottom = '10px';
+                    img.alt = 'Mapa capturado';
+                    
+                    // Crear un contenedor para la imagen y botones
+                    const captureContainer = document.createElement('div');
+                    captureContainer.style.marginTop = '20px';
+                    captureContainer.style.display = 'flex';
+                    captureContainer.style.flexDirection = 'column';
+                    captureContainer.style.gap = '10px';
+                    captureContainer.id = 'captureContainer';
+                    
+                    // Título del contenedor
+                    const title = document.createElement('h3');
+                    title.textContent = 'Captura del mapa:';
+                    captureContainer.appendChild(title);
+                    
+                    // Agregar imagen al contenedor
+                    captureContainer.appendChild(img);
+                    
+                    // Botones para descargar o compartir
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.style.display = 'flex';
+                    buttonContainer.style.gap = '10px';
+                    
+                    // Botón para descargar
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.textContent = 'Descargar imagen';
+                    downloadBtn.className = 'download-btn';
+                    downloadBtn.style.flex = '1';
+                    downloadBtn.style.padding = '12px';
+                    downloadBtn.style.backgroundColor = '#4CAF50';
+                    downloadBtn.style.color = 'white';
+                    downloadBtn.style.border = 'none';
+                    downloadBtn.style.borderRadius = '4px';
+                    downloadBtn.style.cursor = 'pointer';
+                    downloadBtn.style.fontWeight = 'bold';
+                    
+                    // Evento para descargar
+                    downloadBtn.onclick = function() {
+                        const link = document.createElement('a');
+                        link.download = `ubicacion_${Date.now()}.png`;
+                        link.href = imgData;
+                        link.click();
+                    };
+                    
+                    buttonContainer.appendChild(downloadBtn);
+                    
+                    // Verificar si se puede compartir
+                    if (navigator.share) {
+                        const shareBtn = document.createElement('button');
+                        shareBtn.textContent = 'Compartir imagen';
+                        shareBtn.className = 'share-btn';
+                        shareBtn.style.flex = '1';
+                        shareBtn.style.padding = '12px';
+                        shareBtn.style.backgroundColor = '#25D366';
+                        shareBtn.style.color = 'white';
+                        shareBtn.style.border = 'none';
+                        shareBtn.style.borderRadius = '4px';
+                        shareBtn.style.cursor = 'pointer';
+                        shareBtn.style.fontWeight = 'bold';
+                        
+                        // Evento para compartir
+                        shareBtn.onclick = function() {
+                            try {
+                                // Verificar si podemos compartir archivos
+                                canvas.toBlob(function(blob) {
+                                    const message = document.getElementById('message').value;
+                                    const locationText = `Ubicación: ${currentPosition[0].toFixed(6)}, ${currentPosition[1].toFixed(6)}`;
+                                    const shareText = `${message}\n\n${locationText}`;
+                                    
+                                    // Crear un archivo a partir del blob
+                                    const file = new File([blob], "mapa.png", { type: "image/png" });
+                                    
+                                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                                        navigator.share({
+                                            text: shareText,
+                                            files: [file]
+                                        }).then(() => {
+                                            statusMessage.textContent = '¡Imagen compartida con éxito!';
+                                            statusMessage.className = 'status-message success';
+                                        }).catch(error => {
+                                            console.error("Error al compartir:", error);
+                                            statusMessage.textContent = 'Error al compartir. Intenta descargar la imagen.';
+                                            statusMessage.className = 'status-message error';
+                                        });
+                                    } else {
+                                        // Si no podemos compartir archivos, compartimos solo el texto
+                                        navigator.share({
+                                            text: shareText
+                                        }).then(() => {
+                                            statusMessage.textContent = 'Mensaje compartido. Descarga la imagen para compartirla.';
+                                            statusMessage.className = 'status-message success';
+                                        }).catch(error => {
+                                            console.error("Error al compartir texto:", error);
+                                        });
+                                    }
+                                }, 'image/png');
+                            } catch (error) {
+                                console.error("Error al preparar para compartir:", error);
+                                statusMessage.textContent = 'Error al compartir. Intenta descargar la imagen.';
+                                statusMessage.className = 'status-message error';
+                            }
+                        };
+                        
+                        buttonContainer.appendChild(shareBtn);
+                    }
+                    
+                    captureContainer.appendChild(buttonContainer);
+                    
+                    // Eliminar contenedor anterior si existe
+                    const oldContainer = document.getElementById('captureContainer');
+                    if (oldContainer) {
+                        oldContainer.remove();
+                    }
+                    
+                    // Agregar el contenedor a la página
+                    const mainContainer = document.querySelector('.container');
+                    mainContainer.appendChild(captureContainer);
+                    
+                    // Desplazar a la imagen
+                    captureContainer.scrollIntoView({ behavior: 'smooth' });
+                    
+                    // Actualizar mensaje de estado
+                    statusMessage.textContent = 'Mapa capturado con éxito';
+                    statusMessage.className = 'status-message success';
+                    
+                    // Ocultar mensaje después de unos segundos
+                    setTimeout(() => {
+                        statusMessage.className = 'status-message';
+                    }, 3000);
+                    
+                } catch (error) {
+                    console.error("Error procesando la imagen:", error);
+                    statusMessage.textContent = 'Error al procesar la imagen. Intenta de nuevo.';
+                    statusMessage.className = 'status-message error';
+                }
+            }).catch(error => {
+                console.error("Error capturando el mapa:", error);
+                statusMessage.textContent = 'Error al capturar el mapa. Intenta de nuevo.';
+                statusMessage.className = 'status-message error';
+            });
+        }, 500);
+    } catch (error) {
+        console.error("Error en la captura:", error);
+        const statusMessage = document.getElementById('statusMessage');
+        statusMessage.textContent = 'Error al procesar la imagen. Intenta de nuevo.';
+        statusMessage.className = 'status-message error';
+    }
+}
+
+// Función auxiliar para convertir Data URI a Blob
+function dataURItoBlob(dataURI) {
+    // Convertir base64 a raw binary data
+    const byteString = atob(dataURI.split(',')[1]);
+    
+    // Separar el tipo de contenido
+    const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
+    
+    // Escribir los bytes de la cadena a un ArrayBuffer
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    
+    // Crear un blob con el ArrayBuffer
+    return new Blob([ab], { type: mimeString });
+}
     </script>
 </body>
 </html>
